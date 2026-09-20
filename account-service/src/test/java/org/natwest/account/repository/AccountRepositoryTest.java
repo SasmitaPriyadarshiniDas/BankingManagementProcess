@@ -2,8 +2,10 @@ package org.natwest.account.repository;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.natwest.account.AccountServiceApplication;
 import org.natwest.account.entity.Account;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.math.BigDecimal;
@@ -12,7 +14,7 @@ import java.util.Optional;
 import static org.junit.Assert.*;
 
 @RunWith(SpringRunner.class)
-//@DataJpaTest
+@ContextConfiguration(classes = AccountServiceApplication.class)
 public class AccountRepositoryTest {
 
     @Autowired
