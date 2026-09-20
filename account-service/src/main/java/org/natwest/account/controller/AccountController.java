@@ -47,10 +47,7 @@ public class AccountController {
     public Mono<ResponseEntity<BalanceResponse>> deposit(@PathVariable String accountId,
                                                          @RequestHeader("Idempotency-Key") String idempotencyKey,
                                                          @Valid @RequestBody MoneyRequest request) {
-
-        return transactionClient
-                .deposit(accountId, request, idempotencyKey)
-                .map(ResponseEntity::ok);
+        return transactionClient.deposit(accountId, request, idempotencyKey).map(ResponseEntity::ok);
     }
 
     @PostMapping("/{accountId}/withdraw")
@@ -59,4 +56,6 @@ public class AccountController {
 
         return transactionClient.withdraw(accountId, request, idempotencyKey).map(ResponseEntity::ok);
     }
+
+
 }

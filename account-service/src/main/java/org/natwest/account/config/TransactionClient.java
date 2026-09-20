@@ -34,6 +34,4 @@ public class TransactionClient {
                 .bodyToMono(BalanceResponse.class);
     }
 
-
-
 }

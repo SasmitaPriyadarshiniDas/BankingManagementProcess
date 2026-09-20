@@ -40,7 +40,7 @@ public class Account {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected Account() {
+    public Account() {
     }
 
     public Account(String accountId, String accountHolder, BigDecimal balance, String currency) {
