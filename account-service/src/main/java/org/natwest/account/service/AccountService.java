@@ -20,25 +20,15 @@ public class AccountService {
 
     @Transactional
     public Account createAccount(AccountRequest request) {
-
-        String accountId = "ACC" + UUID.randomUUID()
-                        .toString()
-                        .replace("-", "")
-                        .substring(0, 8)
-                        .toUpperCase();
-
+        String accountId = "ACC" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         Account account = new Account(accountId, request.accountHolder(), BigDecimal.ZERO, request.currency());
-
         return accountRepository.save(account);
     }
 
     @Transactional//(readOnly = true)
     public BalanceResponse getBalance(String accountId) {
-
         Account account = accountRepository.findById(accountId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Account not found: " + accountId));
-
+                .orElseThrow(() -> new IllegalArgumentException("Account not found: " + accountId));
         return new BalanceResponse(account.getAccountId(), account.getBalance(), account.getCurrency());
     }
 }
