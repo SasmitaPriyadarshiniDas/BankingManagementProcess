@@ -1,12 +1,14 @@
 package org.natwest.transaction.service;
 
 import jakarta.transaction.Transactional;
+import org.natwest.transaction.config.AccountClient;
 import org.natwest.transaction.dto.request.MoneyRequest;
 import org.natwest.transaction.dto.request.TransactionRequest;
 import org.natwest.transaction.dto.response.TransactionResponse;
 import org.natwest.transaction.entity.TransactionLedger;
 import org.natwest.transaction.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -16,88 +18,110 @@ import java.util.UUID;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final AccountClient accountClient;
 
-    public TransactionService(TransactionRepository transactionRepository) {
+    public TransactionService(
+            TransactionRepository transactionRepository,
+            AccountClient accountClient) {
+
         this.transactionRepository = transactionRepository;
+        this.accountClient = accountClient;
     }
 
+    /**
+     * Deposit money into an account.
+     */
     @Transactional
-    public TransactionResponse deposit(String accountId, MoneyRequest request, String idempotencyKey) {
+    public Mono<TransactionResponse> deposit(String accountId, MoneyRequest request, String idempotencyKey) {
         validateAmount(request.amount());
 
-        // TODO: Call account-service using WebClient
-        // AccountResponse accountResponse =
-        //        accountClient.deposit(
-        //                accountId,
-        //                request.amount(),
-        //                idempotencyKey
-        //        );
+        return accountClient.deposit(accountId, request.amount(), idempotencyKey)
+                .map(accountResponse -> {
+                    TransactionLedger transaction = createLedger(accountId, "DEPOSIT", request.amount(),
+                                    accountResponse.balanceAfter(), idempotencyKey);
 
-        BigDecimal balanceAfter = null;
-        TransactionLedger transaction = createLedger(accountId, "DEPOSIT", request.amount(), balanceAfter, idempotencyKey);
-        TransactionLedger saved = transactionRepository.save(transaction);
-        return toResponse(saved);
+                    TransactionLedger saved = transactionRepository.save(transaction);
+                    return toResponse(saved);
+                });
     }
 
+    /**
+     * Withdraw money from an account.
+     */
     @Transactional
-    public TransactionResponse withdraw(String accountId, MoneyRequest request, String idempotencyKey) {
+    public Mono<TransactionResponse> withdraw(String accountId, MoneyRequest request, String idempotencyKey) {
         validateAmount(request.amount());
 
-        // TODO: Call account-service using WebClient
-        // AccountResponse accountResponse =
-        //        accountClient.withdraw(
-        //                accountId,
-        //                request.amount(),
-        //                idempotencyKey
-        //        );
+        return accountClient.withdraw(accountId, request.amount(), idempotencyKey)
+                .map(accountResponse -> {
+                    TransactionLedger transaction = createLedger(accountId, "WITHDRAW", request.amount(),
+                                    accountResponse.balanceAfter(), idempotencyKey);
 
-        BigDecimal balanceAfter = null;
-        TransactionLedger transaction = createLedger(accountId, "WITHDRAW", request.amount(), balanceAfter, idempotencyKey);
-        TransactionLedger saved = transactionRepository.save(transaction);
-
-        return toResponse(saved);
+                    TransactionLedger saved = transactionRepository.save(transaction);
+                    return toResponse(saved);
+                });
     }
 
+    /**
+     * Transfer money between two accounts.
+     */
     @Transactional
-    public TransactionResponse transfer(TransactionRequest request, String idempotencyKey) {
+    public Mono<TransactionResponse> transfer(TransactionRequest request, String idempotencyKey) {
         validateAmount(request.amount());
-
         if (request.fromAccountId().equals(request.toAccountId())) {
-            throw new IllegalArgumentException("Source and destination accounts cannot be same");
+            return Mono.error(new IllegalArgumentException("Source and destination accounts cannot be same"));
         }
 
         /*
-         * TODO:
-         *
          * 1. Debit source account
          * 2. Credit destination account
-         * 3. Create ledger entries
-         *
-         * These calls should be made through WebClient.
+         * 3. Save transaction ledger
          */
 
-        BigDecimal balanceAfter = null;
-        TransactionLedger transaction = createLedger(request.fromAccountId(), "TRANSFER", request.amount(),
-                balanceAfter, idempotencyKey);
-        TransactionLedger saved = transactionRepository.save(transaction);
+        return accountClient.withdraw(request.fromAccountId(), request.amount(), idempotencyKey)
+                .flatMap(sourceAccount ->
+                        accountClient.deposit(request.toAccountId(), request.amount(), idempotencyKey)
+                                .map(destinationAccount -> {
 
-        return toResponse(saved);
+                                    TransactionLedger transaction = createLedger(
+                                                    request.fromAccountId(), "TRANSFER",
+                                                    request.amount(), sourceAccount.balanceAfter(), idempotencyKey);
+
+                                    TransactionLedger saved = transactionRepository.save(transaction);
+                                    return toResponse(saved);
+                                })
+                );
     }
 
-    private TransactionLedger createLedger(String accountId, String transactionType, BigDecimal amount, BigDecimal balanceAfter, String idempotencyKey) {
-
-        return new TransactionLedger(UUID.randomUUID(), accountId, transactionType, amount, balanceAfter, idempotencyKey, Instant.now());
+    /**
+     * Creates ledger entry.
+     */
+    private TransactionLedger createLedger(String accountId, String transactionType,
+                                           BigDecimal amount, BigDecimal balanceAfter, String idempotencyKey) {
+        return new TransactionLedger(UUID.randomUUID(), accountId, transactionType,
+                amount, balanceAfter, idempotencyKey, Instant.now());
     }
 
-    private TransactionResponse toResponse(TransactionLedger transaction) {
+    /**
+     * Converts entity to response.
+     */
+    private TransactionResponse toResponse(
+            TransactionLedger transaction) {
 
         return new TransactionResponse(
-                transaction.getTransactionId(), transaction.getAccountId(),
+                transaction.getTransactionId(),
+                transaction.getAccountId(),
                 transaction.getTransactionType(),
-                transaction.getAmount(), transaction.getBalanceAfter(),
-                transaction.getReferenceId(), transaction.getCreatedAt());
+                transaction.getAmount(),
+                transaction.getBalanceAfter(),
+                transaction.getReferenceId(),
+                transaction.getCreatedAt()
+        );
     }
 
+    /**
+     * Validates transaction amount.
+     */
     private void validateAmount(BigDecimal amount) {
 
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {

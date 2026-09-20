@@ -1,0 +1,24 @@
+CREATE DATABASE IF NOT EXISTS testdb;
+
+USE testdb;
+
+CREATE TABLE account (
+    account_id VARCHAR(50) PRIMARY KEY,
+    account_holder VARCHAR(100) NOT NULL,
+    balance DECIMAL(19,4) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
+CREATE TABLE idempotency_request (
+    idempotency_key VARCHAR(100) PRIMARY KEY,
+    transaction_id CHAR(36),
+    status VARCHAR(20) NOT NULL,
+    response JSON,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_idempotency_transaction
+    FOREIGN KEY (transaction_id)
+    REFERENCES transaction_ledger(transaction_id)
+);
+
+

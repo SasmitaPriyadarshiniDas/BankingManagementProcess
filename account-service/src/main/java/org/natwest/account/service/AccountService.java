@@ -37,8 +37,7 @@ public class AccountService {
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Account not found: " + accountId));
+                        new IllegalArgumentException("Account not found: " + accountId));
 
         return new BalanceResponse(account.getAccountId(), account.getBalance(), account.getCurrency());
     }
